@@ -32,8 +32,9 @@ class Canny:
         self.pipe.enable_model_cpu_offload()
         self.pipe.enable_xformers_memory_efficient_attention()
 
+    @staticmethod
     def _image_to_canny(
-        self, image: PIL.Image.Image, low_th: int = 100, high_th: int = 200
+        image: PIL.Image.Image, low_th: int = 100, high_th: int = 200
     ) -> PIL.Image.Image:
         """Converts an input PIL image to a Canny edge-detected image using Canny function and concatenates the result to create a 3-channel image.
 
