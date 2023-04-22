@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
-from text_detector import Detector
-from text_eraser import LaMa
+from detector import Detector
+
+from eraser import LaMa
 
 
 class AutoEraser:

@@ -1,0 +1,7 @@
+diffusers==0.14.0
+transformers
+xformers
+numpy
+opencv-python
+torch
+git+https://github.com/huggingface/accelerate.git
