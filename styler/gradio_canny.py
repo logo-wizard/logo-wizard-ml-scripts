@@ -4,10 +4,10 @@ import cv2
 import einops
 import numpy as np
 import torch
-from annotator.canny import CannyDetector
-from annotator.util import HWC3, resize_image
-from cldm.ddim_hacked import DDIMSampler
-from cldm.model import create_model, load_state_dict
+from annotator_util import HWC3, resize_image
+from canny_detector import CannyDetector
+from ddim_hacked import DDIMSampler
+from model_config import create_model, load_state_dict
 from pytorch_lightning import seed_everything
 
 preprocessor = None

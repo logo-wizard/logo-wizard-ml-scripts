@@ -4,6 +4,8 @@ import torch
 
 
 class LaMa:
+    """Class is designed for image inpainting, which is the process of filling in damaged parts of an image."""
+
     pad_mod = 8
 
     def __init__(self, model_path: str, device: str) -> None:
@@ -13,6 +15,14 @@ class LaMa:
 
     @staticmethod
     def _normalize_img(np_img: np.ndarray) -> np.ndarray:
+        """Normalizes the input image by converting it to a float32 array and scaling the pixel values to be between 0 and 1.
+
+        Args:
+            np_img (np.ndarray): image to normalize.
+
+        Returns:
+            np.ndarray: normalized image.
+        """
         if len(np_img.shape) == 2:
             np_img = np_img[:, :, np.newaxis]
         np_img = np.transpose(np_img, (2, 0, 1))
@@ -20,6 +30,15 @@ class LaMa:
         return np_img
 
     def _forward(self, image: np.ndarray, mask: np.ndarray) -> np.ndarray:
+        """Performs the forward pass through the PyTorch model using the input image and mask.
+
+        Args:
+            image (np.ndarray): image to process.
+            mask (np.ndarray): mask with the damaged areas.
+
+        Returns:
+            np.ndarray: the resulting image with the missing parts filled in.
+        """
         image = self._normalize_img(image)
         mask = self._normalize_img(mask)
 
@@ -56,6 +75,15 @@ class LaMa:
 
     @torch.no_grad()
     def __call__(self, image: np.ndarray, mask: np.ndarray) -> np.ndarray:
+        """Performs the inpainting process by padding the input image and mask, passing them through the PyTorch model.
+
+        Args:
+            image (np.ndarray): image to process
+            mask (np.ndarray): mask with the damaged areas.
+
+        Returns:
+            np.ndarray: the resulting image with the missing parts filled in.
+        """
         origin_height, origin_width = image.shape[:2]
         pad_image = self._pad_img(image, mod=self.pad_mod)
         pad_mask = self._pad_img(mask, mod=self.pad_mod)
