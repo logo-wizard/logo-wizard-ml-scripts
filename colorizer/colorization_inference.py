@@ -1,18 +1,14 @@
-import datetime
-import glob
-import os
-import sys
+import warnings
+
 import cv2
 import numpy as np
 import torch
 from einops import rearrange
 from skimage import color
-import warnings
 from timm.models import create_model
-import torch
-import modeling
 
-class Gamut():
+
+class Gamut:
     def __init__(self, gamut_size=110):
         self.gamut_size = gamut_size
         self.win_size = gamut_size * 2
@@ -45,16 +41,20 @@ class Gamut():
         a, b = self.ab_grid.xy2ab(pos[0], pos[1])
         L = self.l_in
         lab = np.array([L, a, b])
-        color = lab2rgb_1d(lab, clip=True, dtype='uint8')
+        color = lab2rgb_1d(lab, clip=True, dtype="uint8")
         return color
 
 
-class Grid():
+class Grid:
     def __init__(self, gamut_size=110, D=1):
         self.D = D
-        self.vals_b, self.vals_a = np.meshgrid(np.arange(-gamut_size, gamut_size + D, D),
-                                               np.arange(-gamut_size, gamut_size + D, D))
-        self.pts_full_grid = np.concatenate((self.vals_a[:, :, np.newaxis], self.vals_b[:, :, np.newaxis]), axis=2)
+        self.vals_b, self.vals_a = np.meshgrid(
+            np.arange(-gamut_size, gamut_size + D, D),
+            np.arange(-gamut_size, gamut_size + D, D),
+        )
+        self.pts_full_grid = np.concatenate(
+            (self.vals_a[:, :, np.newaxis], self.vals_b[:, :, np.newaxis]), axis=2
+        )
         self.A = self.pts_full_grid.shape[0]
         self.B = self.pts_full_grid.shape[1]
         self.gamut_size = gamut_size
@@ -62,8 +62,10 @@ class Grid():
     def update_gamut(self, l_in):
         warnings.filterwarnings("ignore")
         thresh = 1.0
-        pts_lab = np.concatenate((l_in + np.zeros((self.A, self.B, 1)), self.pts_full_grid), axis=2)
-        self.pts_rgb = (255 * np.clip(color.lab2rgb(pts_lab), 0, 1)).astype('uint8')
+        pts_lab = np.concatenate(
+            (l_in + np.zeros((self.A, self.B, 1)), self.pts_full_grid), axis=2
+        )
+        self.pts_rgb = (255 * np.clip(color.lab2rgb(pts_lab), 0, 1)).astype("uint8")
         pts_lab_back = color.rgb2lab(self.pts_rgb)
         pts_lab_diff = np.linalg.norm(pts_lab - pts_lab_back, axis=2)
 
@@ -84,8 +86,8 @@ class Grid():
         return a, b
 
 
-class Colorization():
-    def __init__(self, model, load_size=224, win_size=512, device='cpu'):
+class Colorization:
+    def __init__(self, model, load_size=224, win_size=512, device="cpu"):
         self.image_file = None
         self.pos = None
         self.model = model
@@ -118,8 +120,12 @@ class Colorization():
         im_gray = cv2.cvtColor(im_bgr, cv2.COLOR_BGR2GRAY)
         self.im_gray3 = cv2.cvtColor(im_gray, cv2.COLOR_GRAY2BGR)
 
-        self.gray_win = cv2.resize(self.im_gray3, (rw, rh), interpolation=cv2.INTER_CUBIC)
-        im_bgr = cv2.resize(im_bgr, (self.load_size, self.load_size), interpolation=cv2.INTER_CUBIC)
+        self.gray_win = cv2.resize(
+            self.im_gray3, (rw, rh), interpolation=cv2.INTER_CUBIC
+        )
+        im_bgr = cv2.resize(
+            im_bgr, (self.load_size, self.load_size), interpolation=cv2.INTER_CUBIC
+        )
         self.im_rgb = cv2.cvtColor(im_bgr, cv2.COLOR_BGR2RGB)
         lab_win = color.rgb2lab(self.im_win[:, :, ::-1])
 
@@ -134,7 +140,6 @@ class Colorization():
         self.brushWidth = 2 * self.scale
 
         self.scale_gamut = float(np.max((rw, rh))) / self.load_size
-
 
     def scale_point(self, pnt):
         x = int((pnt[0] - self.dw) / float(self.win_w) * self.load_size)
@@ -151,9 +156,9 @@ class Colorization():
     def calibrate_color(self, c, pos):
         x, y = self.scale_point(pos)
 
-        color_array = np.array((c[0], c[1], c[2])).astype('uint8')
+        color_array = np.array((c[0], c[1], c[2])).astype("uint8")
         mean_L = self.im_l[y, x]
-        snap_color = snap_ab(mean_L, color_array) 
+        snap_color = snap_ab(mean_L, color_array)
         return (snap_color[0], snap_color[1], snap_color[2])
 
     def scale_point_control(self, in_x, in_y, w):
@@ -165,7 +170,7 @@ class Colorization():
         w = int(self.brushWidth / self.scale_gamut)
         x1, y1 = self.scale_point_control(pnt[0], pnt[1], -w)
         tl = (x1, y1)
-        br = (x1 + 1, y1 + 1) # hint size fixed to 2
+        br = (x1 + 1, y1 + 1)  # hint size fixed to 2
         c = (int(clr[0]), int(clr[1]), int(clr[2]))
         cv2.rectangle(mask, tl, br, 255, -1)
         cv2.rectangle(im, tl, br, c, -1)
@@ -203,29 +208,38 @@ class Colorization():
         self.im_ab0 = im_lab[1:3, :, :]
 
         # _im_lab is 1) normalized 2) a torch tensor
-        _im_lab = self.im_lab.transpose((2,0,1))
-        _im_lab = np.concatenate(((_im_lab[[0], :, :] - 50) / 100, _im_lab[1:, :, :] / 110), axis=0)
+        _im_lab = self.im_lab.transpose((2, 0, 1))
+        _im_lab = np.concatenate(
+            ((_im_lab[[0], :, :] - 50) / 100, _im_lab[1:, :, :] / 110), axis=0
+        )
         _im_lab = torch.from_numpy(_im_lab).type(torch.FloatTensor).to(self.device)
 
         # _img_mask is 1) normalized ab 2) flipped mask
-        _img_mask = np.concatenate((self.im_ab0 / 110, (255 - self.im_mask0) / 255), axis=0)
+        _img_mask = np.concatenate(
+            (self.im_ab0 / 110, (255 - self.im_mask0) / 255), axis=0
+        )
         _img_mask = torch.from_numpy(_img_mask).type(torch.FloatTensor).to(self.device)
 
         # _im_lab is the full color image, _img_mask is the ab_hint + mask
         ab = self.model(_im_lab.unsqueeze(0), _img_mask.unsqueeze(0))
-        ab = rearrange(ab, 'b (h w) (p1 p2 c) -> b (h p1) (w p2) c', 
-                        h=self.load_size//self.model.patch_size, w=self.load_size//self.model.patch_size,
-                        p1=self.model.patch_size, p2=self.model.patch_size)[0]
+        ab = rearrange(
+            ab,
+            "b (h w) (p1 p2 c) -> b (h p1) (w p2) c",
+            h=self.load_size // self.model.patch_size,
+            w=self.load_size // self.model.patch_size,
+            p1=self.model.patch_size,
+            p2=self.model.patch_size,
+        )[0]
         ab = ab.detach().numpy()
 
         ab_win = cv2.resize(ab, (self.win_w, self.win_h), interpolation=cv2.INTER_CUBIC)
         ab_win = ab_win * 110
         pred_lab = np.concatenate((self.l_win[..., np.newaxis], ab_win), axis=2)
-        pred_rgb = (np.clip(color.lab2rgb(pred_lab), 0, 1) * 255).astype('uint8')
+        pred_rgb = (np.clip(color.lab2rgb(pred_lab), 0, 1) * 255).astype("uint8")
         self.result = pred_rgb
 
 
-def get_model(model_path='icolorit_small_4ch_patch16_224.pth', device='cpu'):
+def get_model(model_path="icolorit_small_4ch_patch16_224.pth", device="cpu"):
     model = create_model(
         model_path[:-4],
         pretrained=False,
@@ -233,12 +247,12 @@ def get_model(model_path='icolorit_small_4ch_patch16_224.pth', device='cpu'):
         drop_block_rate=None,
         use_rpb=True,
         avg_hint=True,
-        head_mode='cnn',
+        head_mode="cnn",
         mask_cent=False,
     )
-    model.to('cpu')
+    model.to("cpu")
     checkpoint = torch.load(model_path, map_location=device)
-    model.load_state_dict(checkpoint['model'])
+    model.load_state_dict(checkpoint["model"])
     model.eval()
 
     return model
@@ -248,18 +262,17 @@ def rgb2lab_1d(in_rgb):
     return color.rgb2lab(in_rgb[np.newaxis, np.newaxis, :]).flatten()
 
 
-def lab2rgb_1d(in_lab, clip=True, dtype='uint8'):
+def lab2rgb_1d(in_lab, clip=True, dtype="uint8"):
     tmp_rgb = color.lab2rgb(in_lab[np.newaxis, np.newaxis, :]).flatten()
     if clip:
         tmp_rgb = np.clip(tmp_rgb, 0, 1)
-    if dtype == 'uint8':
-        tmp_rgb = np.round(tmp_rgb * 255).astype('uint8')
+    if dtype == "uint8":
+        tmp_rgb = np.round(tmp_rgb * 255).astype("uint8")
     return tmp_rgb
 
 
-def snap_ab(input_l, input_rgb, return_type='rgb'):
-    ''' given an input lightness and rgb, snap the color into a region where l,a,b is in-gamut
-    '''
+def snap_ab(input_l, input_rgb, return_type="rgb"):
+    """given an input lightness and rgb, snap the color into a region where l,a,b is in-gamut"""
     T = 20
     warnings.filterwarnings("ignore")
     input_lab = rgb2lab_1d(np.array(input_rgb))  # convert input to lab
@@ -274,40 +287,34 @@ def snap_ab(input_l, input_rgb, return_type='rgb'):
         if dif_lab < 1:
             break
 
-    conv_rgb_ingamut = lab2rgb_1d(conv_lab, clip=True, dtype='uint8')
-    if (return_type == 'rgb'):
+    conv_rgb_ingamut = lab2rgb_1d(conv_lab, clip=True, dtype="uint8")
+    if return_type == "rgb":
         return conv_rgb_ingamut
 
-    elif(return_type == 'lab'):
+    elif return_type == "lab":
         conv_lab_ingamut = rgb2lab_1d(conv_rgb_ingamut)
         return conv_lab_ingamut
 
 
 def main(img_path, model_path, win_size, device, poses, poses_gamut):
     color_model = get_model(model_path=model_path, device=device)
-    colorization = Colorization(model=color_model, load_size=224, win_size=win_size, device=device)
+    colorization = Colorization(
+        model=color_model, load_size=224, win_size=win_size, device=device
+    )
     colorization.read_image(img_path)
     for pos, pos_gamut in zip(poses, poses_gamut):
         colorization.set_pos(pos)
         colorization.change_color(pos_gamut)
-    cv2.imshow('result', cv2.cvtColor(colorization.result, cv2.COLOR_RGB2BGR))
+    cv2.imshow("result", cv2.cvtColor(colorization.result, cv2.COLOR_RGB2BGR))
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
 
-if __name__ == '__main__':
-    img_path = 'auxiliary/demo_image.jpg'
-    model_path = 'auxiliary/icolorit_small_4ch_patch16_224.pth'
+if __name__ == "__main__":
+    img_path = "auxiliary/demo_image.jpg"
+    model_path = "auxiliary/icolorit_small_4ch_patch16_224.pth"
     win_size = 720
-    device = 'cpu'
-    pos = [
-        (297, 269),
-        (116, 258),
-        (311, 75)
-    ]
-    pos_gamut = [
-        (173, 175),
-        (180, 88),
-        (136, 75)
-    ]
+    device = "cpu"
+    pos = [(297, 269), (116, 258), (311, 75)]
+    pos_gamut = [(173, 175), (180, 88), (136, 75)]
     main(img_path, model_path, win_size, device, pos, pos_gamut)
