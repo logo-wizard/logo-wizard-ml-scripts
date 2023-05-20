@@ -26,3 +26,9 @@ pip install -e .
 `styler` folder contains scripts for applying different styles to an image. It uses `ControlNet` with the Canny algorithm for edge detection.  
   
 `ControlNet` with `Stable Diffusion` model is loaded automatically using [diffusers](https://github.com/huggingface/diffusers) framework.  
+
+## Data processing
+`data_processing` folder contains scripts for captioning collected dataset and for processing survey results. You can find more information in the corresponding notebooks.
+
+## LoRa fine-tuning
+`lora` folder contains sripts for Stable Diffusion fine-tuning using LoRa method. It contains two different implementations with LoRa and LoHa (LoRA with Hadamard Product representation). You can find more information in the corresponding notebooks.
